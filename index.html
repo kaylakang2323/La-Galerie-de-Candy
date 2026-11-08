@@ -2219,7 +2219,7 @@ function campTap(w,o,h){
   else if(w==='win'&&campInside())o.userData.open=!o.userData.open;
 }
 function updateCamper(dt,tt){
-  var C=window.__camp;campSndUpdate(dt);
+  var C=window.__camp;campSndUpdate(dt);socialTick(dt);
   if(campDoorU!==campDoorT){campDoorU+=Math.sign(campDoorT-campDoorU)*Math.min(Math.abs(campDoorT-campDoorU),dt*1.6);}
   C.piv.rotation.y=-1.75*ease(campDoorU);
   var open=campDoorU>.5;campDoorObs.x0=open?0:CX+1.3;campDoorObs.x1=open?0:CX+1.75;campDoorObs.z0=open?0:CZ-.1;campDoorObs.z1=open?0:CZ+1.1;
@@ -2231,6 +2231,126 @@ function updateCamper(dt,tt){
   if(near)C.anim(tt);
   if(near&&(tt-(updateCamper.l||0))>.1){updateCamper.l=tt;window.__tvDraw(tt);}
 }
+
+/* ---------- 방문자 수 · 작품 하트 · 방명록 · 캠핑카 유튜브 링크 ---------- */
+var SOC={api:'https://script.google.com/macros/s/AKfycbzPy_XJ-fCHoFTqxS61ygyikyJD-rUFwbJ8NpmPaQrrw27Xf4V4bLNt4T6faFIl18L4/exec',
+  form:'https://forms.gle/TdnNji4UDGMx3no9A',yt:['Dn0LJbWdLH8','bEdAsriPQpE'],
+  hearts:false,counts:{},book:null,liked:{},chips:[],ready:false,boardT:null,boardC:null,graT:null,graC:null,pa:0};
+try{SOC.liked=JSON.parse(localStorage.getItem('candy_likes')||'{}')||{};}catch(e){}
+try{SOC.pend=JSON.parse(localStorage.getItem('candy_pend')||'[]')||[];}catch(e){SOC.pend=[];}
+function socRR(x,a,b,w,h,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath();}
+function socHeart(x,cx,cy,s,fill,line){x.beginPath();x.moveTo(cx,cy+s*.9);x.bezierCurveTo(cx-s*1.5,cy-s*.1,cx-s*.7,cy-s*1.1,cx,cy-s*.35);x.bezierCurveTo(cx+s*.7,cy-s*1.1,cx+s*1.5,cy-s*.1,cx,cy+s*.9);x.closePath();
+  if(fill){x.fillStyle=fill;x.fill();}if(line){x.strokeStyle=line;x.lineWidth=Math.max(3,s*.22);x.stroke();}}
+function socChip(c){var on=!!SOC.liked[c.id],n=SOC.counts['like:'+c.id];
+  c.m.material.color.set(on?0xff3b55:0xf3a6b2);c.m.material.emissive.set(on?0x5a0614:0x2a0a10);
+  var x=c.ctx;x.clearRect(0,0,128,56);x.fillStyle='rgba(255,255,255,.93)';socRR(x,3,3,122,50,25);x.fill();x.strokeStyle='rgba(0,0,0,.16)';x.lineWidth=2;x.stroke();
+  x.fillStyle='#1c1f23';x.font='600 30px "IBM Plex Mono",monospace';x.textAlign='center';x.textBaseline='middle';x.fillText(n===undefined?'–':String(n),64,30);c.tex.needsUpdate=true;}
+var SOC_HEART=(function(){var sh=new THREE.Shape();sh.moveTo(0,-.9);sh.bezierCurveTo(-1.5,.1,-.7,1.1,0,.35);sh.bezierCurveTo(.7,1.1,1.5,.1,0,-.9);
+  var g=new THREE.ExtrudeGeometry(sh,{depth:.5,bevelEnabled:true,bevelThickness:.22,bevelSize:.2,bevelSegments:5,curveSegments:20});g.center();return g;})();
+function socAddChip(id,x0,y0,z0,k){if(!SOC.hearts)return null;var cv=mkCanvas(128,56),tex=new THREE.CanvasTexture(cv),g=new THREE.Group();
+  var m=new THREE.Mesh(SOC_HEART,new THREE.MeshPhongMaterial({color:0xf3a6b2,shininess:90,specular:0xffd0d8,emissive:0x2a0a10}));m.scale.set(.11*k,.11*k,.11*k);m.userData.social='like:'+id;g.add(m);
+  var lb=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));lb.scale.set(.2*k,.0875*k,1);lb.position.y=-.22*k;g.add(lb);
+  var hit=new THREE.Mesh(new THREE.SphereGeometry(.25*k,8,6),new THREE.MeshBasicMaterial({visible:false}));hit.userData.social='like:'+id;g.add(hit);
+  g.position.set(x0,y0,z0);scene.add(g);pickables.push(m);pickables.push(hit);
+  var c={id:id,ctx:cv.getContext('2d'),tex:tex,g:g,m:m,base:y0,ph:SOC.chips.length*1.7,pop:0};SOC.chips.push(c);socChip(c);return c;}
+/* 작품마다: 명패 오른쪽 허공에 둥실 떠 있는 입체 하트 */
+ART.forEach(function(a,i){socAddChip('art'+(i+1),XS[i]+a.w/2+.58,1.3,WALL_Z+.32,1);});
+/* 캠핑카: TV 오른쪽 */
+socAddChip('camper',CX+1.2,1.95,CZ-3.3,.8);
+(function(){
+  var gc=mkCanvas(750,300),gt=new THREE.CanvasTexture(gc);SOC.graC=gc;SOC.graT=gt;
+  var gm=new THREE.Mesh(new THREE.PlaneGeometry(1.5,.6),new THREE.MeshBasicMaterial({map:gt,transparent:true,depthWrite:false}));gm.position.set(CX+.55,1.06,CZ-3.588);scene.add(gm);
+  [[1.04,0],[.904,1]].forEach(function(a){var h=new THREE.Mesh(new THREE.PlaneGeometry(1.4,.13),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));h.position.set(CX+.55,a[0],CZ-3.584);h.userData.social='yt'+a[1];scene.add(h);pickables.push(h);});
+})();
+function socGraffiti(){var x=SOC.graC.getContext('2d'),F='"Nanum Pen Script","Segoe Print","Comic Sans MS",cursive',ink='#2a1d14',red='#e8453c';x.clearRect(0,0,750,300);
+  x.save();x.translate(26,66);x.rotate(-.035);x.fillStyle=ink;x.font='68px '+F;x.textBaseline='alphabetic';x.fillText('Like it on YouTube too!',0,0);
+  x.strokeStyle=red;x.lineWidth=5;x.lineCap='round';x.beginPath();x.moveTo(4,16);for(var k=0;k<14;k++)x.lineTo(4+k*26+13,k%2?16:24);x.stroke();x.restore();
+  socHeart(x,640,46,16,red);socHeart(x,688,82,11,'#f08a8a');
+  x.save();x.translate(30,116);x.rotate(-.02);x.fillStyle=ink;x.font='36px '+F;var t1='유튜브에서도 ',w1=x.measureText(t1).width;x.fillText(t1,0,0);socHeart(x,w1+14,-12,9,red);x.fillText(' 눌러주세요',w1+30,0);x.restore();
+  [['Stop Hunting Asian Elephants',178],['Stay in the trees, Red Panda',246]].forEach(function(r){x.save();x.translate(34,r[1]);x.rotate(-.015);
+    x.fillStyle=red;x.beginPath();x.moveTo(0,-24);x.lineTo(26,-12);x.lineTo(0,0);x.closePath();x.fill();
+    x.fillStyle=ink;x.font='46px '+F;x.fillText(r[0],44,0);var w=x.measureText(r[0]).width;
+    x.strokeStyle=ink;x.lineWidth=3;x.beginPath();x.moveTo(44,10);for(var k=0;k<Math.floor(w/18);k++)x.lineTo(44+k*18+9,k%2?10:15);x.stroke();
+    x.beginPath();x.moveTo(44+w+14,-14);x.lineTo(44+w+36,-14);x.lineTo(44+w+36,-36);x.moveTo(44+w+36,-14);x.lineTo(44+w+14,-36);x.stroke();x.restore();});
+  SOC.graT.needsUpdate=true;}
+/* 입구 서쪽 벽(고양이 반대편): 방명록 보드 + 선반 + 펼친 책 */
+(function(){
+  var bc=mkCanvas(780,480),bt=new THREE.CanvasTexture(bc);SOC.boardC=bc;SOC.boardT=bt;
+  var bm=new THREE.Mesh(new THREE.PlaneGeometry(1.3,.8),new THREE.MeshBasicMaterial({map:bt}));bm.position.set(-10.495,1.95,1.2);bm.rotation.y=Math.PI/2;bm.userData.social='guest';scene.add(bm);pickables.push(bm);
+  var shelf=new THREE.Mesh(new THREE.BoxGeometry(.36,.05,1.0),lam(0x9a6b3f));shelf.position.set(-10.32,1.0,1.2);scene.add(shelf);
+  function bk(w,h,d,x,y,z,c){var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),lam(c));m.position.set(x,y,z);m.userData.social='guest';scene.add(m);pickables.push(m);return m;}
+  bk(.32,.03,.58,-10.32,1.04,1.2,0x2b6a73);bk(.28,.035,.27,-10.32,1.06,1.065,0xf7f3e8);bk(.28,.035,.27,-10.32,1.06,1.335,0xf7f3e8);bk(.3,.045,.02,-10.32,1.06,1.2,0x1f4f56);
+})();
+function socBoard(){var x=SOC.boardC.getContext('2d'),n=SOC.counts.visits;x.fillStyle='#fafaf8';x.fillRect(0,0,780,480);x.strokeStyle='rgba(28,31,35,.18)';x.lineWidth=3;x.strokeRect(14,14,752,452);
+  x.fillStyle='#2b6a73';x.fillRect(60,150,90,6);x.fillStyle='#1c1f23';x.textBaseline='alphabetic';x.font='600 76px "IBM Plex Sans KR",sans-serif';x.fillText('Guestbook',60,125);
+  x.fillStyle='#5d636a';x.font='500 30px "IBM Plex Sans KR",sans-serif';x.fillText('Leave a note for Candy.',60,215);x.fillText('Tap the book to read and flip the pages.',60,260);
+  x.fillStyle='#2b6a73';x.font='500 34px "IBM Plex Mono",monospace';x.fillText(n===undefined?'Visitors  --':'Visitors  '+Number(n).toLocaleString('en-US'),60,390);
+  socHeart(x,690,390,22,'#e8453c');if(SOC.err){x.fillStyle='#c4673f';x.font='500 22px "IBM Plex Mono",monospace';x.fillText('offline',560,440);}SOC.boardT.needsUpdate=true;}
+socBoard();socGraffiti();
+/* 서버 통신 */
+function socShow(){SOC.err=false;SOC.chips.forEach(socChip);socBoard();}
+function socGet(){return fetch(SOC.api+'?action=get').then(function(r){return r.json();}).then(function(j){if(!j||!j.ok)throw 0;SOC.counts=j.counts||{};SOC.book=j.guestbook||[];socShow();return j;});}
+function socInit(){
+  var day=new Date(Date.now()+9*3600000).toISOString().slice(0,10),last=null;try{last=localStorage.getItem('candy_visit_day');}catch(e){}
+  var p=last===day?socGet():fetch(SOC.api+'?action=visit').then(function(r){return r.json();}).then(function(j){if(!j||!j.ok)throw 0;SOC.counts=j.counts||{};try{localStorage.setItem('candy_visit_day',day);}catch(e){}socShow();});
+  p.then(function(){socFlush();}).catch(function(){SOC.err=true;socBoard();});
+}
+function socSave(){try{localStorage.setItem('candy_pend',JSON.stringify(SOC.pend));}catch(e){}}
+function socSend(id,d){return fetch(SOC.api+'?action=like&id='+encodeURIComponent(id)+'&d='+d).then(function(r){return r.json();});}
+function socFlush(){var p=SOC.pend.splice(0);socSave();p.forEach(function(a){socSend(a[0],a[1]).catch(function(){SOC.pend.push(a);socSave();});});}
+function socLike(id){var on=!SOC.liked[id],k='like:'+id;if(on)SOC.liked[id]=1;else delete SOC.liked[id];try{localStorage.setItem('candy_likes',JSON.stringify(SOC.liked));}catch(e){}
+  SOC.counts[k]=Math.max(0,(SOC.counts[k]||0)+(on?1:-1));SOC.chips.forEach(function(c){if(c.id===id){c.pop=1;socChip(c);}});
+  socSend(id,on?1:-1).then(function(j){if(j&&j.counts){SOC.counts=j.counts;SOC.chips.forEach(socChip);socBoard();}}).catch(function(){SOC.pend.push([id,on?1:-1]);socSave();});}
+function socTap(s){
+  if(s.indexOf('like:')===0)socLike(s.slice(5));
+  else if(s==='guest')socOpen();
+  else if(s==='yt0'||s==='yt1')window.open('https://youtu.be/'+SOC.yt[+s.slice(2)],'_blank','noopener');
+}
+var socT=0;
+function socialTick(dt){socT+=dt;SOC.chips.forEach(function(c){var t=socT*1.5+c.ph,k=1;if(c.pop>0){c.pop=Math.max(0,c.pop-dt*2.8);k=1+.4*Math.sin(c.pop*3.14);}
+  c.g.position.y=c.base+Math.sin(t)*.05;c.g.scale.set(k,k,k);c.m.rotation.y=Math.sin(t*.55)*.55;c.m.rotation.z=Math.sin(t*.8)*.08;});}
+/* 방명록 책 (DOM) */
+function socOpen(){
+  if(!SOC.dom)socBuild();SOC.dom.hidden=false;SOC.pg=0;SOC.msg='Loading…';socRender(0);
+  socGet().then(function(){SOC.msg=SOC.book.length?'':'No messages yet. Be the first to write one!';socRender(0);}).catch(function(){SOC.err=true;socBoard();SOC.msg="Couldn't load messages right now.";socRender(0);});}
+function socBuild(){
+  var st=document.createElement('style');st.textContent=
+  '#gb{position:fixed;inset:0;z-index:20;background:rgba(20,22,26,.5);display:grid;place-items:center;padding:12px;box-sizing:border-box;touch-action:manipulation;-webkit-user-select:none}'+
+  '.gbB{position:relative;width:min(720px,100%);background:#fbf8f1;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.35);padding:16px 16px 12px;box-sizing:border-box;max-height:100%;display:flex;flex-direction:column;gap:10px}'+
+  '.gbSp{display:flex;gap:0;perspective:1200px;min-height:280px}.gbP{flex:1;min-width:0;padding:6px 16px;display:flex;flex-direction:column;gap:12px;overflow:hidden}'+
+  '.gbP+.gbP{border-left:1px solid rgba(28,31,35,.16);background:linear-gradient(90deg,rgba(0,0,0,.05),rgba(0,0,0,0) 24px)}'+
+  '.gbE{display:flex;flex-direction:column;gap:2px}.gbM{font:22px/1.3 "Nanum Pen Script","IBM Plex Sans KR",cursive,sans-serif;color:#2a1d14;overflow-wrap:anywhere;white-space:pre-wrap}'+
+  '.gbN{font-size:11px;color:#5d636a;font-family:var(--font-num)}.gbMsg{color:#5d636a;font-size:13px;line-height:1.5}'+
+  '.gbBar{display:flex;align-items:center;justify-content:space-between;gap:8px}.gbT{font-weight:600;font-size:15px}.gbV{font-family:var(--font-num);font-size:11px;color:#2b6a73}'+
+  '.gbNav{display:flex;align-items:center;justify-content:center;gap:12px;font-family:var(--font-num);font-size:12px;color:#5d636a}'+
+  '#gb a.pill{display:grid;place-items:center;text-decoration:none;flex:none;padding:0 18px;height:40px;box-sizing:border-box}.gbAct{display:flex;gap:8px;align-items:center;justify-content:space-between}'+
+  '@keyframes gbIn{from{opacity:0;transform:rotateY(14deg) translateX(14px)}to{opacity:1;transform:none}}@keyframes gbInL{from{opacity:0;transform:rotateY(-14deg) translateX(-14px)}to{opacity:1;transform:none}}'+
+  '.gbP.a{animation:gbIn .35s ease}.gbP.l{animation:gbInL .35s ease}';
+  document.head.appendChild(st);
+  var d=document.createElement('div');d.id='gb';d.hidden=true;
+  d.innerHTML='<div class="gbB"><div class="gbBar"><div><div class="gbT">Guestbook</div><div class="gbV" id="gbV"></div></div><button class="btn" id="gbX" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="gbSp" id="gbSp"></div><div class="gbNav"><button class="btn" id="gbPr" aria-label="Previous page"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><span id="gbPg"></span><button class="btn" id="gbNx" aria-label="Next page"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button></div><div class="gbAct"><span class="gbMsg">Messages appear after Candy approves them.</span><a class="pill" id="gbW" target="_blank" rel="noopener">Write a message</a></div></div>';
+  document.body.appendChild(d);SOC.dom=d;d.querySelector('#gbW').href=SOC.form;
+  d.addEventListener('click',function(e){if(e.target===d)d.hidden=true;});
+  d.querySelector('#gbX').addEventListener('click',function(){d.hidden=true;});
+  d.querySelector('#gbPr').addEventListener('click',function(){socRender(-1);});d.querySelector('#gbNx').addEventListener('click',function(){socRender(1);});
+  var lk=document.createElement('link');lk.rel='stylesheet';lk.href='https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap';document.head.appendChild(lk);
+}
+function socRender(dir){
+  var wide=window.innerWidth>=620,per=3,list=SOC.book||[],pages=Math.max(1,Math.ceil(list.length/per)),step=wide?2:1,sp=SOC.dom.querySelector('#gbSp');
+  if(dir)SOC.pg=Math.max(0,Math.min(pages-1,SOC.pg+dir*step));if(wide&&SOC.pg%2)SOC.pg--;
+  sp.textContent='';
+  for(var s=0;s<step;s++){var pi=SOC.pg+s,pg=document.createElement('div');pg.className='gbP '+(dir?(dir>0?'a':'l'):'');
+    if(pi<pages){var items=list.slice(pi*per,pi*per+per);
+      if(pi===0&&SOC.msg){var m=document.createElement('div');m.className='gbMsg';m.textContent=SOC.msg;pg.appendChild(m);}
+      items.forEach(function(it){var e=document.createElement('div');e.className='gbE';var a=document.createElement('div');a.className='gbM';a.textContent=it.m;var b=document.createElement('div');b.className='gbN';b.textContent='— '+it.n+(it.t?' · '+it.t:'');e.appendChild(a);e.appendChild(b);pg.appendChild(e);});}
+    sp.appendChild(pg);}
+  SOC.dom.querySelector('#gbPg').textContent=(SOC.pg+1)+(wide&&SOC.pg+2<=pages?'–'+(SOC.pg+2):'')+' / '+pages;
+  var v=SOC.counts.visits;SOC.dom.querySelector('#gbV').textContent=v===undefined?'':'Visitors '+Number(v).toLocaleString('en-US');}
+/* 페이지가 다 열린 뒤에 서버 연결 + 손글씨 폰트 준비 */
+(function(){function later(){setTimeout(function(){socInit();var lk=document.createElement('link');lk.rel='stylesheet';lk.href='https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap';
+  lk.onload=function(){if(document.fonts&&document.fonts.load)document.fonts.load('60px "Nanum Pen Script"','Like it 유튜브에서도 눌러주세요').then(socGraffiti);};document.head.appendChild(lk);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(socBoard);},1800);}
+  if(document.readyState==='complete')later();else window.addEventListener('load',later);})();
 
 /* ---------- 입력 ---------- */
 var hintEl=document.getElementById('hint');
@@ -2267,6 +2387,7 @@ function pick(cx,cy){
   if(hit.object.userData.bird){callBird(hit.object.userData.bird);hideHint();return;}
   if(hit.object.userData.door){toggleDoors();hideHint();return;}
   if(hit.object.userData.camp){campTap(hit.object.userData.camp,hit.object,hit);hideHint();return;}
+  if(hit.object.userData.social){socTap(hit.object.userData.social);hideHint();return;}
   if(hit.object.userData.fountain){callDrink();hideHint();return;}
   if(hit.object.userData.bowl){feedBowl();hideHint();return;}
   if(hit.object.userData.ball){var bdx=BALL.x-pos.x,bdz=BALL.z-pos.z,bl=Math.hypot(bdx,bdz)||1;BALL.vx=bdx/bl*2.8;BALL.vz=bdz/bl*2.8;summonPlay(2);hideHint();return;}
